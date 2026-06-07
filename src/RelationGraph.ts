@@ -37,7 +37,8 @@ export class RelationGraph {
 
   private rafId = 0;
   private dirty = false;
-  /** Whether fit() has ever succeeded. Used to auto-fit once when the canvas first gains size. */
+  /** Whether fit() has succeeded since the last setData. Drives a one-time auto-fit once the
+   *  canvas gains a real size (e.g. setData was called while hidden). Reset on each setData. */
   private fitted = false;
 
   // Pointer interaction state
@@ -87,6 +88,7 @@ export class RelationGraph {
   /** Set the tree, fit it into the view, and render. */
   setData(root: GraphNode): void {
     this.root = root;
+    this.fitted = false; // each setData re-fits — if hidden now, fit happens when shown
     const res = layout(root, this.opts.layout);
     this.rects = res.rects;
     this.bounds = res.bounds;
