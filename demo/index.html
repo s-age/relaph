@@ -55,7 +55,9 @@
       </div>
     </div>
 
-    <!-- Run `npm run build` first, then open this file (it imports from dist). -->
+    <!-- ES module demo: must be served over http:// (a file:// origin blocks module imports
+         via CORS). Run `npm run build`, then serve the folder (e.g. `python3 -m http.server`).
+         To open directly from the filesystem with no server, use demo/standalone.html instead. -->
     <script type="module">
       import { RelationGraph } from '../dist/index.js';
 
