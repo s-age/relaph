@@ -37,6 +37,8 @@ export class RelationGraph {
 
   private rafId = 0;
   private dirty = false;
+  /** Whether fit() has ever succeeded. Used to auto-fit once when the canvas first gains size. */
+  private fitted = false;
 
   // Pointer interaction state
   private pointerId: number | null = null;
@@ -104,14 +106,14 @@ export class RelationGraph {
     const ch = this.canvas.clientHeight;
     const bw = this.bounds.maxX - this.bounds.minX;
     const bh = this.bounds.maxY - this.bounds.minY;
-    if (bw <= 0 || bh <= 0 || cw <= 0 || ch <= 0) return;
+    if (bw <= 0 || bh <= 0 || cw <= 0 || ch <= 0) return; // canvas hidden / zero-size: cannot fit yet
     const scale = Math.min((cw - padding * 2) / bw, (ch - padding * 2) / bh);
     this.vp.setScale(scale);
     // Move the bounding-box center to the view center.
     const cx = (this.bounds.minX + this.bounds.maxX) / 2;
     const cy = (this.bounds.minY + this.bounds.maxY) / 2;
-    this.vp.tx = cw / 2 - cx * this.vp.scale;
-    this.vp.ty = ch / 2 - cy * this.vp.scale;
+    this.vp.setTranslate(cw / 2 - cx * this.vp.scale, ch / 2 - cy * this.vp.scale);
+    this.fitted = true;
     this.requestRender();
   }
 
@@ -143,7 +145,11 @@ export class RelationGraph {
     const h = this.canvas.clientHeight;
     this.canvas.width = Math.max(1, Math.round(w * this.dpr));
     this.canvas.height = Math.max(1, Math.round(h * this.dpr));
-    this.requestRender();
+    // Auto-fit only the first time the canvas gains a real size (e.g. setData was called while
+    // hidden in a tab/modal). After the first successful fit we never re-fit on resize, so the
+    // user's pan/zoom is preserved.
+    if (this.root && !this.fitted) this.fit();
+    else this.requestRender();
   }
 
   /** Convert event coordinates to CSS px within the canvas. */
@@ -211,6 +217,7 @@ export class RelationGraph {
 
   private draw = (): void => {
     this.dirty = false;
+    this.rafId = 0; // the scheduled frame is now running; `dirty` alone tracks "render pending"
     const { ctx } = this;
     const { width, height } = this.canvas;
 

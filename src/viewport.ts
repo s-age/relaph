@@ -29,6 +29,11 @@ export class Viewport {
     this.ty += dy;
   }
 
+  setTranslate(tx: number, ty: number): void {
+    this.tx = tx;
+    this.ty = ty;
+  }
+
   /**
    * Zoom centered on the given screen point (Google-Maps style).
    * Adjusts translate so the world point under the cursor stays fixed across the zoom.

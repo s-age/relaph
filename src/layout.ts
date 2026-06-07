@@ -27,9 +27,9 @@ interface Measured {
   bounds: Bounds;
 }
 
-const sizeOf = (n: GraphNode, c: LayoutConfig): [number, number] => [
-  n.width ?? c.defaultWidth,
-  n.height ?? c.defaultHeight,
+const sizeOf = (node: GraphNode, config: LayoutConfig): [number, number] => [
+  node.width ?? config.defaultWidth,
+  node.height ?? config.defaultHeight,
 ];
 
 const boundsOf = (rects: Iterable<Rect>): Bounds => {
@@ -46,9 +46,11 @@ const boundsOf = (rects: Iterable<Rect>): Bounds => {
   return { minX, minY, maxX, maxY };
 };
 
-/** Translate m.rects by (dx, dy) and merge into dst. */
-const mergeShifted = (dst: Map<GraphNode, Rect>, m: Measured, dx: number, dy: number): void => {
-  for (const [n, r] of m.rects) dst.set(n, { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h });
+/** Translate measured.rects by (dx, dy) and merge into dst. */
+const mergeShifted = (dst: Map<GraphNode, Rect>, measured: Measured, dx: number, dy: number): void => {
+  for (const [node, rect] of measured.rects) {
+    dst.set(node, { x: rect.x + dx, y: rect.y + dy, w: rect.w, h: rect.h });
+  }
 };
 
 /**
@@ -56,8 +58,8 @@ const mergeShifted = (dst: Map<GraphNode, Rect>, m: Measured, dx: number, dy: nu
  * start = leading (vertical stack = top / horizontal stack = left), center = centered,
  * end = trailing (bottom / right).
  */
-const alignStart = (parentSize: number, total: number, b: Baseline): number =>
-  b === 'start' ? 0 : b === 'end' ? parentSize - total : parentSize / 2 - total / 2;
+const alignStart = (parentSize: number, total: number, baseline: Baseline): number =>
+  baseline === 'start' ? 0 : baseline === 'end' ? parentSize - total : parentSize / 2 - total / 2;
 
 /**
  * Measure a subtree and return its placement in local coordinates (root rect = (0,0)).
@@ -65,8 +67,8 @@ const alignStart = (parentSize: number, total: number, b: Baseline): number =>
  * Each child is anchored by its own node rect, so connector attachment stays stable
  * no matter how deeply grandchildren nest.
  */
-function measure(node: GraphNode, c: LayoutConfig): Measured {
-  const [w, h] = sizeOf(node, c);
+function measure(node: GraphNode, config: LayoutConfig): Measured {
+  const [w, h] = sizeOf(node, config);
   const rects = new Map<GraphNode, Rect>();
   rects.set(node, { x: 0, y: 0, w, h });
 
@@ -82,43 +84,47 @@ function measure(node: GraphNode, c: LayoutConfig): Measured {
   // -> attachment points are evenly spaced and subtrees never overlap. Uniform children keep
   //    the same pitch as a naive stack.
   const placeVertical = (children: GraphNode[], side: 'right' | 'left') => {
-    const n = children.length;
-    if (n === 0) return;
-    const ms = children.map((ch) => measure(ch, c));
+    const count = children.length;
+    if (count === 0) return;
+    const subtrees = children.map((child) => measure(child, config));
     // Overhang above / below relative to the node center (= childRect.h / 2).
-    const above = ms.map((m, i) => m.rects.get(children[i]!)!.h / 2 - m.bounds.minY);
-    const below = ms.map((m, i) => m.bounds.maxY - m.rects.get(children[i]!)!.h / 2);
+    const above = subtrees.map((s, i) => s.rects.get(children[i]!)!.h / 2 - s.bounds.minY);
+    const below = subtrees.map((s, i) => s.bounds.maxY - s.rects.get(children[i]!)!.h / 2);
     // Uniform pitch between attachment points (max of each neighbor's minimum non-overlap pitch).
     let pitch = 0;
-    for (let i = 0; i < n - 1; i++) pitch = Math.max(pitch, below[i]! + c.nodeMargin + above[i + 1]!);
-    const groupH = above[0]! + (n - 1) * pitch + below[n - 1]!;
+    for (let i = 0; i < count - 1; i++) {
+      pitch = Math.max(pitch, below[i]! + config.nodeMargin + above[i + 1]!);
+    }
+    const groupH = above[0]! + (count - 1) * pitch + below[count - 1]!;
     const firstCenter = alignStart(h, groupH, baseline) + above[0]!; // block top + first child's overhang
-    children.forEach((ch, i) => {
-      const m = ms[i]!;
-      const childRect = m.rects.get(ch)!;
-      const cx = side === 'right' ? w + c.rankMargin : -c.rankMargin - childRect.w;
+    children.forEach((child, i) => {
+      const subtree = subtrees[i]!;
+      const childRect = subtree.rects.get(child)!;
+      const cx = side === 'right' ? w + config.rankMargin : -config.rankMargin - childRect.w;
       const cy = firstCenter + i * pitch - childRect.h / 2; // place node center on the attachment point
-      mergeShifted(rects, m, cx, cy);
+      mergeShifted(rects, subtree, cx, cy);
     });
   };
 
   // Horizontal stack (top / bottom): x-axis version of the above. Evenly space the node centers.
   const placeHorizontal = (children: GraphNode[], side: 'top' | 'bottom') => {
-    const n = children.length;
-    if (n === 0) return;
-    const ms = children.map((ch) => measure(ch, c));
-    const before = ms.map((m, i) => m.rects.get(children[i]!)!.w / 2 - m.bounds.minX);
-    const after = ms.map((m, i) => m.bounds.maxX - m.rects.get(children[i]!)!.w / 2);
+    const count = children.length;
+    if (count === 0) return;
+    const subtrees = children.map((child) => measure(child, config));
+    const before = subtrees.map((s, i) => s.rects.get(children[i]!)!.w / 2 - s.bounds.minX);
+    const after = subtrees.map((s, i) => s.bounds.maxX - s.rects.get(children[i]!)!.w / 2);
     let pitch = 0;
-    for (let i = 0; i < n - 1; i++) pitch = Math.max(pitch, after[i]! + c.nodeMargin + before[i + 1]!);
-    const groupW = before[0]! + (n - 1) * pitch + after[n - 1]!;
+    for (let i = 0; i < count - 1; i++) {
+      pitch = Math.max(pitch, after[i]! + config.nodeMargin + before[i + 1]!);
+    }
+    const groupW = before[0]! + (count - 1) * pitch + after[count - 1]!;
     const firstCenter = alignStart(w, groupW, baseline) + before[0]!;
-    children.forEach((ch, i) => {
-      const m = ms[i]!;
-      const childRect = m.rects.get(ch)!;
-      const cy = side === 'bottom' ? h + c.rankMargin : -c.rankMargin - childRect.h;
+    children.forEach((child, i) => {
+      const subtree = subtrees[i]!;
+      const childRect = subtree.rects.get(child)!;
+      const cy = side === 'bottom' ? h + config.rankMargin : -config.rankMargin - childRect.h;
       const cx = firstCenter + i * pitch - childRect.w / 2; // place node center on the attachment point
-      mergeShifted(rects, m, cx, cy);
+      mergeShifted(rects, subtree, cx, cy);
     });
   };
 
@@ -131,7 +137,7 @@ function measure(node: GraphNode, c: LayoutConfig): Measured {
 }
 
 /** Lay out the root tree and return a map of world-coordinate rectangles. */
-export function layout(root: GraphNode, c: LayoutConfig): LayoutResult {
-  const m = measure(root, c);
-  return { rects: m.rects, bounds: m.bounds };
+export function layout(root: GraphNode, config: LayoutConfig): LayoutResult {
+  const measured = measure(root, config);
+  return { rects: measured.rects, bounds: measured.bounds };
 }

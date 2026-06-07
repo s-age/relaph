@@ -42,20 +42,20 @@ function roundRectPath(ctx: CanvasRenderingContext2D, r: Rect, radius: number): 
 /** Draw an elbow connector from parent to child (parent edge center <-> child edge center). */
 function drawConnector(rc: RenderContext, parent: Rect, child: Rect, dir: Direction): void {
   const { ctx } = rc;
-  const a = edgeCenter(parent, dir);
-  const z = edgeCenter(child, opposite(dir));
+  const from = edgeCenter(parent, dir);
+  const to = edgeCenter(child, opposite(dir));
   ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
+  ctx.moveTo(from.x, from.y);
   if (dir === 'right' || dir === 'left') {
-    const midX = (a.x + z.x) / 2;
-    ctx.lineTo(midX, a.y);
-    ctx.lineTo(midX, z.y);
+    const midX = (from.x + to.x) / 2;
+    ctx.lineTo(midX, from.y);
+    ctx.lineTo(midX, to.y);
   } else {
-    const midY = (a.y + z.y) / 2;
-    ctx.lineTo(a.x, midY);
-    ctx.lineTo(z.x, midY);
+    const midY = (from.y + to.y) / 2;
+    ctx.lineTo(from.x, midY);
+    ctx.lineTo(to.x, midY);
   }
-  ctx.lineTo(z.x, z.y);
+  ctx.lineTo(to.x, to.y);
   ctx.stroke();
 }
 
