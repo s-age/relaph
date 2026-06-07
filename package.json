@@ -1,6 +1,6 @@
 {
   "name": "relaph",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zero-dependency TypeScript canvas library for infinitely-nestable relation graphs with Google-Maps-like zoom & pan.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -13,7 +13,11 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "sideEffects": false,
   "author": "s-age <ohira0196+npm@gmail.com>",
   "license": "MIT",
@@ -36,7 +40,15 @@
     "test:watch": "vitest",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
-  "keywords": ["canvas", "graph", "network", "tree", "zoom", "pan", "typescript"],
+  "keywords": [
+    "canvas",
+    "graph",
+    "network",
+    "tree",
+    "zoom",
+    "pan",
+    "typescript"
+  ],
   "devDependencies": {
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
