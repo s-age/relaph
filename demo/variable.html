@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>relation-graph — variable children</title>
+    <style>
+      html, body { margin: 0; height: 100%; }
+      canvas { width: 100vw; height: 100vh; display: block; background: #f8fafc; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <script type="module">
+      import { RelationGraph } from '../dist/index.js';
+      // Variable / asymmetric children: c2 has grandchildren below, c4 above and below.
+      const tree = {
+        id: 'root', label: 'Root', baseline: 'center',
+        children: [
+          { id: 'c1', label: 'C-1', direction: 'right' },
+          { id: 'c2', label: 'C-2 (kids below)', direction: 'right', baseline: 'start', children: [
+            { id: 'g1', label: 'G-1', direction: 'bottom' },
+            { id: 'g2', label: 'G-2', direction: 'bottom' },
+          ]},
+          { id: 'c3', label: 'C-3', direction: 'right' },
+          { id: 'c4', label: 'C-4 (kids above+below)', direction: 'right', children: [
+            { id: 'g3', label: 'G-3', direction: 'top' },
+            { id: 'g4', label: 'G-4', direction: 'bottom' },
+          ]},
+          { id: 'c5', label: 'C-5', direction: 'right' },
+        ],
+      };
+      const g = new RelationGraph(document.getElementById('c'), { margin: { node: 20, rank: 70 } });
+      g.setData(tree);
+    </script>
+  </body>
+</html>

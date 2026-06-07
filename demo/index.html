@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>relation-graph demo</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: system-ui, sans-serif;
+      }
+      #app {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        background: #f8fafc;
+      }
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .hud {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.85);
+        padding: 8px 12px;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        font-size: 13px;
+      }
+      .hud button {
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        border-radius: 6px;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="c"></canvas>
+      <div class="hud">
+        <button id="in">+</button>
+        <button id="out">&minus;</button>
+        <button id="fit">Fit</button>
+        <span id="status">Scroll to zoom / drag to pan / click a node</span>
+      </div>
+    </div>
+
+    <!-- Run `npm run build` first, then open this file (it imports from dist). -->
+    <script type="module">
+      import { RelationGraph } from '../dist/index.js';
+
+      const tree = {
+        id: 'root',
+        label: 'Root',
+        children: [
+          {
+            id: 'a',
+            label: 'Right A',
+            direction: 'right',
+            baseline: 'center',
+            // Three child groups [[A1,A2], [A3,A4,A5], [A6]] modeled as G1/G2/G3
+            children: [
+              { id: 'g1', label: 'G1', direction: 'right', children: [
+                { id: 'a1', label: 'A1', direction: 'right' },
+                { id: 'a2', label: 'A2', direction: 'right' },
+              ]},
+              { id: 'g2', label: 'G2', direction: 'right', children: [
+                { id: 'a3', label: 'A3', direction: 'right' },
+                { id: 'a4', label: 'A4', direction: 'right' },
+                { id: 'a5', label: 'A5', direction: 'right' },
+              ]},
+              { id: 'g3', label: 'G3', direction: 'right', children: [
+                { id: 'a6', label: 'A6', direction: 'right' },
+              ]},
+            ],
+          },
+          { id: 'b', label: 'Right B', direction: 'right' },
+          {
+            id: 'l',
+            label: 'Left',
+            direction: 'left',
+            baseline: 'center', // center-align the child group (L-1/L-2) — the default
+            children: [
+              { id: 'l1', label: 'L-1', direction: 'left' },
+              { id: 'l2', label: 'L-2', direction: 'left' },
+            ],
+          },
+          {
+            id: 'd',
+            label: 'Bottom',
+            direction: 'bottom',
+            children: [
+              { id: 'd1', label: 'D-1', direction: 'bottom' },
+              { id: 'd2', label: 'D-2', direction: 'bottom' },
+            ],
+          },
+          { id: 't', label: 'Top', direction: 'top', children: [{ id: 't1', label: 'T-1', direction: 'top' }] },
+        ],
+      };
+
+      const canvas = document.getElementById('c');
+      const status = document.getElementById('status');
+      const graph = new RelationGraph(canvas, {
+        margin: { node: 20, rank: 70 },
+        onNodeClick: (node) => (status.textContent = `clicked: ${node.id} (${node.label})`),
+        onBackgroundClick: () => (status.textContent = 'background'),
+      });
+      graph.setData(tree);
+
+      document.getElementById('in').onclick = () => graph.zoomBy(1.2);
+      document.getElementById('out').onclick = () => graph.zoomBy(1 / 1.2);
+      document.getElementById('fit').onclick = () => graph.fit();
+    </script>
+  </body>
+</html>
