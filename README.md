@@ -38,6 +38,21 @@ const graph = new RelationGraph(canvas, {
 graph.setData(tree);
 ```
 
+### Via a `<script>` tag (no bundler / CDN)
+
+A global (IIFE) build is shipped at `dist/index.global.js`, exposing a `Relaph` global.
+A classic script tag works directly from `file://` (unlike ES module imports, which a
+`file://` origin blocks via CORS — that is why `demo/index.html` needs a server, while
+`demo/standalone.html` does not).
+
+```html
+<script src="https://unpkg.com/relaph/dist/index.global.js"></script>
+<script>
+  const graph = new Relaph.RelationGraph(canvas, { /* options */ });
+  graph.setData(tree);
+</script>
+```
+
 ## API
 
 | Method | Description |
