@@ -20,7 +20,9 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
-      # prepublishOnly runs typecheck + test + build before publishing.
+      # Build explicitly so the workflow's intent is self-evident.
+      - run: npm run build
+      # publish; prepublishOnly (typecheck + test + build) re-verifies as a safety net.
       - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

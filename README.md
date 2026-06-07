@@ -64,6 +64,8 @@ omitted: it is not worth the computational cost and the way it tends to distort 
 
 ```sh
 npm install
+npm run typecheck  # type-check (tsc --noEmit)
+npm test           # run vitest (layout & viewport logic)
 npm run build      # generate dist/
-# open demo/index.html in a browser (it imports from dist)
+# then open demo/index.html in a browser (it imports from dist)
 ```
