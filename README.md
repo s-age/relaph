@@ -9,6 +9,8 @@ npm install relaph
 ## Features
 
 - Place children on any side (`direction`: top / right / bottom / left)
+- Per-node sizing: fixed `width` / `height`, or `'fit-content'` to size the box to the label
+- Label overflow policy (`labelOverflow`): `'visible'` (default) or `'truncate'` — pixel-accurate `…` ellipsis inside the box
 - Sibling and rank (level) spacing (`margin.node` / `margin.rank`)
 - Child-group alignment (`baseline`: `start` / `center` / `end` — vertical stack = top/middle/bottom, horizontal stack = left/middle/right)
 - Connectors always join edge-center to edge-center
@@ -51,6 +53,29 @@ A classic script tag works directly from `file://` (unlike ES module imports, wh
   const graph = new Relaph.RelationGraph(canvas, { /* options */ });
   graph.setData(tree);
 </script>
+```
+
+### Node sizing & labels
+
+`width` / `height` on a node accept a number (world units) or `'fit-content'`, which sizes
+the box to the label measured with the node's effective font, plus `labelPadding`
+(default `{ x: 16, y: 10 }`) on each side. Nodes that omit them use `defaultNodeSize`.
+
+Labels are always a single line. When a label is wider than its box, `labelOverflow`
+decides what happens: `'visible'` (default) draws it overflowing the box, `'truncate'`
+ellipsizes it to fit inside the box minus `labelPadding.x`.
+
+```ts
+const graph = new RelationGraph(canvas, {
+  labelOverflow: 'truncate',            // fixed-size nodes ellipsize instead of overflowing
+  labelPadding: { x: 12, y: 10 },
+});
+graph.setData({
+  id: 'root',
+  label: 'sized to this label',
+  width: 'fit-content',                 // grows with the label — never truncated
+  children: [{ id: 'a', label: 'a very long label in a fixed box', width: 220 }],
+});
 ```
 
 ## API

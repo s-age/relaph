@@ -58,6 +58,50 @@ describe('layout — even distribution with variable subtrees', () => {
   });
 });
 
+describe("layout — 'fit-content' sizing", () => {
+  // Stub measurer: 10 world units per label character, fixed height 30.
+  const measured: LayoutConfig = {
+    ...cfg,
+    measureNode: (n) => ({ width: (n.label ?? '').length * 10, height: 30 }),
+  };
+
+  it('resolves width/height from measureNode', () => {
+    const n: GraphNode = { id: 'n', label: 'hello', width: 'fit-content', height: 'fit-content' };
+    const { rects } = layout(n, measured);
+    expect(rects.get(n)!.w).toBe(50);
+    expect(rects.get(n)!.h).toBe(30);
+  });
+
+  it('mixes per-axis: fixed height stays, fit-content width measures', () => {
+    const n: GraphNode = { id: 'n', label: 'hello!', width: 'fit-content', height: 40 };
+    const { rects } = layout(n, measured);
+    expect(rects.get(n)!.w).toBe(60);
+    expect(rects.get(n)!.h).toBe(40);
+  });
+
+  it('falls back to defaults when no measureNode is supplied', () => {
+    const n: GraphNode = { id: 'n', label: 'hello', width: 'fit-content', height: 'fit-content' };
+    const { rects } = layout(n, cfg);
+    expect(rects.get(n)!.w).toBe(cfg.defaultWidth);
+    expect(rects.get(n)!.h).toBe(cfg.defaultHeight);
+  });
+
+  it('variable-width siblings still keep >= nodeMargin gaps', () => {
+    const kids: GraphNode[] = ['a', 'quite-a-long-label', 'mid'].map((label, i) => ({
+      id: `c${i}`,
+      label,
+      width: 'fit-content',
+      direction: 'bottom',
+    }));
+    const p: GraphNode = { id: 'p', children: kids };
+    const { rects } = layout(p, measured);
+    const rs = kids.map((k) => rects.get(k)!);
+    for (let i = 0; i < rs.length - 1; i++) {
+      expect(rs[i + 1]!.x - (rs[i]!.x + rs[i]!.w)).toBeGreaterThanOrEqual(measured.nodeMargin - 1e-6);
+    }
+  });
+});
+
 describe('layout — directions & bounds', () => {
   it('places children on the correct side and bounds enclose everything', () => {
     const r: GraphNode = { id: 'r', direction: 'right' };

@@ -5,6 +5,31 @@ export interface RenderContext {
   rects: Map<GraphNode, Rect>;
   nodeStyle: NodeStyle;
   connector: { color: string; width: number };
+  labelOverflow: 'visible' | 'truncate';
+  labelPadding: { x: number; y: number };
+}
+
+const ELLIPSIS = '…';
+
+/**
+ * Fit `label` into `maxWidth` using `measure` (text -> width). Returns the label unchanged
+ * when it already fits, the longest `…`-terminated prefix that fits when it doesn't, and ''
+ * when not even the ellipsis alone fits.
+ */
+export function fitLabel(measure: (text: string) => number, label: string, maxWidth: number): string {
+  if (measure(label) <= maxWidth) return label;
+  if (measure(ELLIPSIS) > maxWidth) return '';
+  // Binary search the longest prefix whose width, ellipsis included, still fits.
+  let lo = 0;
+  let hi = label.length - 1;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (measure(label.slice(0, mid) + ELLIPSIS) <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+  // Don't cut a surrogate pair in half (the prefix would end on a lone high surrogate).
+  if (lo > 0 && /[\uD800-\uDBFF]/.test(label[lo - 1]!)) lo -= 1;
+  return lo === 0 ? ELLIPSIS : label.slice(0, lo) + ELLIPSIS;
 }
 
 /**
@@ -95,7 +120,11 @@ export function render(rc: RenderContext, root: GraphNode): void {
       if (node.label) {
         ctx.fillStyle = s.textColor;
         ctx.font = s.font;
-        ctx.fillText(node.label, r.x + r.w / 2, r.y + r.h / 2);
+        const label =
+          rc.labelOverflow === 'truncate'
+            ? fitLabel((t) => ctx.measureText(t).width, node.label, r.w - rc.labelPadding.x * 2)
+            : node.label;
+        if (label) ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2);
       }
     }
     for (const child of node.children ?? []) walkNodes(child);

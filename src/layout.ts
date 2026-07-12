@@ -5,6 +5,13 @@ export interface LayoutConfig {
   rankMargin: number;
   defaultWidth: number;
   defaultHeight: number;
+  /**
+   * Resolves the box of a 'fit-content' node (label size + padding). Only consulted for
+   * nodes that request 'fit-content'; when absent those nodes fall back to the defaults,
+   * so the pure layout stays usable without a canvas (RelationGraph always supplies one
+   * backed by ctx.measureText).
+   */
+  measureNode?: (node: GraphNode) => { width: number; height: number };
 }
 
 export interface Bounds {
@@ -27,10 +34,16 @@ interface Measured {
   bounds: Bounds;
 }
 
-const sizeOf = (node: GraphNode, config: LayoutConfig): [number, number] => [
-  node.width ?? config.defaultWidth,
-  node.height ?? config.defaultHeight,
-];
+const sizeOf = (node: GraphNode, config: LayoutConfig): [number, number] => {
+  const fit =
+    node.width === 'fit-content' || node.height === 'fit-content'
+      ? config.measureNode?.(node)
+      : undefined;
+  const w = node.width === 'fit-content' ? (fit?.width ?? config.defaultWidth) : (node.width ?? config.defaultWidth);
+  const h =
+    node.height === 'fit-content' ? (fit?.height ?? config.defaultHeight) : (node.height ?? config.defaultHeight);
+  return [w, h];
+};
 
 const boundsOf = (rects: Iterable<Rect>): Bounds => {
   let minX = Infinity;

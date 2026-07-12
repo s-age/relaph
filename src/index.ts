@@ -5,6 +5,7 @@ export type {
   Baseline,
   Direction,
   GraphNode,
+  NodeSize,
   NodeStyle,
   Point,
   Rect,

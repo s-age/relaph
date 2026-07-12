@@ -23,6 +23,12 @@ export interface Rect {
   h: number;
 }
 
+/**
+ * Node box size: a fixed size in world units, or 'fit-content' to size the box to the
+ * node's label (measured with the node's effective font, plus labelPadding).
+ */
+export type NodeSize = number | 'fit-content';
+
 export interface NodeStyle {
   fill: string;
   stroke: string;
@@ -39,10 +45,10 @@ export interface NodeStyle {
 export interface GraphNode {
   id: string;
   label?: string;
-  /** Node rectangle width. Falls back to defaultNodeSize. */
-  width?: number;
-  /** Node rectangle height. Falls back to defaultNodeSize. */
-  height?: number;
+  /** Node rectangle width, or 'fit-content' to size to the label. Falls back to defaultNodeSize. */
+  width?: NodeSize;
+  /** Node rectangle height, or 'fit-content' to size to the label. Falls back to defaultNodeSize. */
+  height?: NodeSize;
   /** Placement direction seen from the parent. Default 'right'. Ignored on the root. */
   direction?: Direction;
   /**
@@ -74,6 +80,17 @@ export interface RelationGraphOptions {
   connector?: { color?: string; width?: number };
   /** Background color. Default '#ffffff'. */
   background?: string;
+  /**
+   * Inner padding between the label and the node border, per side.
+   * Sizes 'fit-content' boxes and insets 'truncate' clipping. Default { x: 16, y: 10 }.
+   */
+  labelPadding?: { x?: number; y?: number };
+  /**
+   * What to do when a label is wider than its node box ('fit-content' boxes never are).
+   * - 'visible' (default): draw the full label, overflowing the box.
+   * - 'truncate': ellipsize the label to fit inside the box minus labelPadding.x.
+   */
+  labelOverflow?: 'visible' | 'truncate';
   /** Zoom lower / upper bound. Default 0.2 / 4. */
   minScale?: number;
   maxScale?: number;

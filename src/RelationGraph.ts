@@ -18,6 +18,8 @@ interface Resolved {
   connector: { color: string; width: number };
   background: string;
   zoomSpeed: number;
+  labelPadding: { x: number; y: number };
+  labelOverflow: 'visible' | 'truncate';
 }
 
 /** Movement threshold (CSS px) for distinguishing a click from a drag. */
@@ -61,6 +63,7 @@ export class RelationGraph {
         rankMargin: options.margin?.rank ?? 64,
         defaultWidth: options.defaultNodeSize?.width ?? 120,
         defaultHeight: options.defaultNodeSize?.height ?? 44,
+        measureNode: (node) => this.measureNode(node),
       },
       nodeStyle: { ...DEFAULT_NODE_STYLE, ...options.nodeStyle },
       connector: {
@@ -69,6 +72,8 @@ export class RelationGraph {
       },
       background: options.background ?? '#ffffff',
       zoomSpeed: options.zoomSpeed ?? 1,
+      labelPadding: { x: options.labelPadding?.x ?? 16, y: options.labelPadding?.y ?? 10 },
+      labelOverflow: options.labelOverflow ?? 'visible',
     };
     this.cb = { onNodeClick: options.onNodeClick, onBackgroundClick: options.onBackgroundClick };
     this.vp = new Viewport(options.minScale ?? 0.2, options.maxScale ?? 4);
@@ -140,6 +145,24 @@ export class RelationGraph {
   }
 
   // --- Internals ------------------------------------------------------------
+
+  /**
+   * Box of a 'fit-content' node: label measured with the node's effective font, plus
+   * labelPadding on each side. Label-less nodes fall back to the default size (an empty
+   * measurement would collapse the box to bare padding).
+   */
+  private measureNode(node: GraphNode): { width: number; height: number } {
+    const label = node.label ?? '';
+    if (!label) return { width: this.opts.layout.defaultWidth, height: this.opts.layout.defaultHeight };
+    const font = node.style?.font ?? this.opts.nodeStyle.font;
+    this.ctx.font = font;
+    const m = this.ctx.measureText(label);
+    const boxH = m.fontBoundingBoxAscent + m.fontBoundingBoxDescent;
+    // Older engines report no font box metrics; approximate from the font-size token then.
+    const textH = boxH > 0 ? boxH : parseFloat(font) || 16;
+    const pad = this.opts.labelPadding;
+    return { width: m.width + pad.x * 2, height: textH + pad.y * 2 };
+  }
 
   private resize(): void {
     this.dpr = window.devicePixelRatio || 1;
@@ -239,6 +262,8 @@ export class RelationGraph {
       rects: this.rects,
       nodeStyle: this.opts.nodeStyle,
       connector: this.opts.connector,
+      labelOverflow: this.opts.labelOverflow,
+      labelPadding: this.opts.labelPadding,
     };
     render(rc, this.root);
   };
