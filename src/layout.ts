@@ -1,4 +1,4 @@
-import type { Baseline, Direction, GraphNode, Rect } from './types';
+import type { Baseline, Direction, GraphNode, JoinEdge, Rect } from './types';
 
 export interface LayoutConfig {
   nodeMargin: number;
@@ -149,8 +149,80 @@ function measure(node: GraphNode, config: LayoutConfig): Measured {
   return { rects, bounds: boundsOf(rects.values()) };
 }
 
-/** Lay out the root tree and return a map of world-coordinate rectangles. */
-export function layout(root: GraphNode, config: LayoutConfig): LayoutResult {
+/** Shift `node` and every descendant (via `node.children`) already present in `rects` by (dx, dy). */
+const shiftSubtree = (rects: Map<GraphNode, Rect>, node: GraphNode, dx: number, dy: number): void => {
+  const r = rects.get(node);
+  if (r) rects.set(node, { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h });
+  for (const child of node.children ?? []) shiftSubtree(rects, child, dx, dy);
+};
+
+/** Map every node's id to itself, walking the whole tree once. */
+const indexById = (root: GraphNode): Map<string, GraphNode> => {
+  const byId = new Map<string, GraphNode>();
+  const walk = (node: GraphNode) => {
+    byId.set(node.id, node);
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(root);
+  return byId;
+};
+
+/**
+ * Reposition each confluence node (a `JoinEdge.to`) — and its whole subtree — to sit centered
+ * below its sources: `top = max(source.y + source.h) + rankMargin`, `centerX = average(source
+ * center-x)`. Confluences are recomputed to a fixpoint (bounded by one pass per confluence) so
+ * that nesting — a confluence whose own subtree contains another fork+confluence, or whose
+ * source is itself a confluence — settles regardless of processing order: each pass recomputes
+ * every confluence from the CURRENT rects, so a confluence that depended on a not-yet-placed
+ * confluence in an earlier pass is corrected once that one lands.
+ */
+const applyConfluences = (rects: Map<GraphNode, Rect>, root: GraphNode, joinEdges: JoinEdge[], rankMargin: number): void => {
+  if (joinEdges.length === 0) return;
+  const byId = indexById(root);
+  const sourcesByTarget = new Map<string, string[]>();
+  for (const edge of joinEdges) {
+    const list = sourcesByTarget.get(edge.to);
+    if (list) list.push(edge.from);
+    else sourcesByTarget.set(edge.to, [edge.from]);
+  }
+  const targetIds = [...sourcesByTarget.keys()];
+  const maxIterations = targetIds.length + 1;
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    let changed = false;
+    for (const targetId of targetIds) {
+      const target = byId.get(targetId);
+      if (!target) continue;
+      const current = rects.get(target);
+      if (!current) continue;
+      const sourceRects = (sourcesByTarget.get(targetId) ?? [])
+        .map((id) => byId.get(id))
+        .filter((n): n is GraphNode => !!n)
+        .map((n) => rects.get(n))
+        .filter((r): r is Rect => !!r);
+      if (sourceRects.length === 0) continue;
+      const top = Math.max(...sourceRects.map((r) => r.y + r.h)) + rankMargin;
+      const centerX = sourceRects.reduce((sum, r) => sum + (r.x + r.w / 2), 0) / sourceRects.length;
+      const dx = centerX - (current.x + current.w / 2);
+      const dy = top - current.y;
+      if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) continue;
+      changed = true;
+      shiftSubtree(rects, target, dx, dy);
+    }
+    if (!changed) break;
+  }
+};
+
+/**
+ * Lay out the root tree and return a map of world-coordinate rectangles.
+ * `joinEdges` (optional) additionally repositions each confluence (`JoinEdge.to`) below its
+ * sources — see `applyConfluences`. Omitted/empty `joinEdges` reproduces the plain tree layout
+ * exactly (no behavior change for existing callers).
+ */
+export function layout(root: GraphNode, config: LayoutConfig, joinEdges?: JoinEdge[]): LayoutResult {
   const measured = measure(root, config);
+  if (joinEdges && joinEdges.length > 0) {
+    applyConfluences(measured.rects, root, joinEdges, config.rankMargin);
+    return { rects: measured.rects, bounds: boundsOf(measured.rects.values()) };
+  }
   return { rects: measured.rects, bounds: measured.bounds };
 }

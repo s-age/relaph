@@ -1,6 +1,6 @@
 {
   "name": "relaph",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Zero-dependency TypeScript canvas library for infinitely-nestable relation graphs with Google-Maps-like zoom & pan.",
   "type": "module",
   "main": "./dist/index.cjs",

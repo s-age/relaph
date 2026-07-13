@@ -3,8 +3,10 @@ export { Viewport } from './viewport';
 export { layout } from './layout';
 export type {
   Baseline,
+  ConnectorStyle,
   Direction,
   GraphNode,
+  JoinEdge,
   NodeSize,
   NodeStyle,
   Point,

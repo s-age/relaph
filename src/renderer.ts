@@ -1,4 +1,4 @@
-import type { Direction, GraphNode, NodeStyle, Point, Rect } from './types';
+import type { Direction, GraphNode, JoinEdge, NodeStyle, Point, Rect } from './types';
 
 export interface RenderContext {
   ctx: CanvasRenderingContext2D;
@@ -7,6 +7,9 @@ export interface RenderContext {
   connector: { color: string; width: number };
   labelOverflow: 'visible' | 'truncate';
   labelPadding: { x: number; y: number };
+  /** Confluence join edges — drawn in place of the suppressed parent -> confluence tree
+   *  connector (see `render`). Defaults to none. */
+  joinEdges?: JoinEdge[];
 }
 
 const ELLIPSIS = '…';
@@ -84,8 +87,31 @@ function drawConnector(rc: RenderContext, parent: Rect, child: Rect, dir: Direct
   ctx.stroke();
 }
 
+/** Draw one join edge: source's bottom edge-center -> confluence's top edge-center (reusing
+ *  `drawConnector`'s 'bottom' geometry), honoring a per-edge style override. */
+function drawJoinEdge(rc: RenderContext, edge: JoinEdge, byId: Map<string, GraphNode>): void {
+  const { ctx, rects } = rc;
+  const from = byId.get(edge.from);
+  const to = byId.get(edge.to);
+  if (!from || !to) return;
+  const fromRect = rects.get(from);
+  const toRect = rects.get(to);
+  if (!fromRect || !toRect) return;
+  const prevColor = ctx.strokeStyle;
+  const prevWidth = ctx.lineWidth;
+  if (edge.style?.color) ctx.strokeStyle = edge.style.color;
+  if (edge.style?.width) ctx.lineWidth = edge.style.width;
+  drawConnector(rc, fromRect, toRect, 'bottom');
+  ctx.strokeStyle = prevColor;
+  ctx.lineWidth = prevWidth;
+}
+
 export function render(rc: RenderContext, root: GraphNode): void {
   const { ctx, rects } = rc;
+  const joinEdges = rc.joinEdges ?? [];
+  // A node that is a join edge's `to` is a confluence: its incoming visual is the join edge(s),
+  // not the ordinary parent -> child tree connector.
+  const confluenceIds = new Set(joinEdges.map((e) => e.to));
 
   // 1) Draw connectors first so they sit beneath the nodes.
   ctx.strokeStyle = rc.connector.color;
@@ -96,11 +122,24 @@ export function render(rc: RenderContext, root: GraphNode): void {
     if (!pr) return;
     for (const child of node.children ?? []) {
       const cr = rects.get(child);
-      if (cr) drawConnector(rc, pr, cr, child.direction ?? 'right');
+      if (cr && !confluenceIds.has(child.id)) drawConnector(rc, pr, cr, child.direction ?? 'right');
       walkEdges(child);
     }
   };
   walkEdges(root);
+
+  // 1b) Draw the join (confluence) edges on top of the suppressed tree connectors.
+  if (joinEdges.length > 0) {
+    const byId = new Map<string, GraphNode>();
+    const collect = (node: GraphNode) => {
+      byId.set(node.id, node);
+      for (const child of node.children ?? []) collect(child);
+    };
+    collect(root);
+    ctx.strokeStyle = rc.connector.color;
+    ctx.lineWidth = rc.connector.width;
+    for (const edge of joinEdges) drawJoinEdge(rc, edge, byId);
+  }
 
   // 2) Draw the nodes.
   ctx.textAlign = 'center';

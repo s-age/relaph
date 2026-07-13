@@ -64,6 +64,30 @@ export interface GraphNode {
   children?: GraphNode[];
 }
 
+/** Connector (link line) color/width. Shared by the default connector style and per-`JoinEdge`
+ *  overrides. */
+export interface ConnectorStyle {
+  color?: string;
+  width?: number;
+}
+
+/**
+ * A "confluence" edge: draws a connector from `from` (a source node's bottom edge-center) to
+ * `to` (a confluence node's top edge-center), on top of the normal tree layout. `to` is
+ * repositioned by `layout()` to sit centered below all of its sources (see `layout.ts`); the
+ * ordinary parent -> `to` tree connector is suppressed in favor of these join edges (see
+ * `renderer.ts`). `from` / `to` reference `GraphNode.id`. Purely additive: omitting `joinEdges`
+ * (or passing an empty array) reproduces the pre-confluence tree layout/render exactly.
+ */
+export interface JoinEdge {
+  /** Source node id (a tracked branch's tail, or another confluence). */
+  from: string;
+  /** Confluence node id — the node this edge fans into. */
+  to: string;
+  /** Per-edge connector style override, layered over the graph's default connector style. */
+  style?: Partial<ConnectorStyle>;
+}
+
 export interface RelationGraphOptions {
   /** Spacing between sibling nodes and between ranks (levels). */
   margin?: {
@@ -77,7 +101,7 @@ export interface RelationGraphOptions {
   /** Default node style. */
   nodeStyle?: Partial<NodeStyle>;
   /** Connector (link line) style. */
-  connector?: { color?: string; width?: number };
+  connector?: ConnectorStyle;
   /** Background color. Default '#ffffff'. */
   background?: string;
   /**

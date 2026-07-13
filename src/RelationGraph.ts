@@ -1,6 +1,6 @@
 import { layout, type Bounds, type LayoutConfig } from './layout';
 import { render, type RenderContext } from './renderer';
-import type { GraphNode, NodeStyle, Point, Rect, RelationGraphOptions } from './types';
+import type { GraphNode, JoinEdge, NodeStyle, Point, Rect, RelationGraphOptions } from './types';
 import { Viewport } from './viewport';
 
 const DEFAULT_NODE_STYLE: NodeStyle = {
@@ -34,6 +34,7 @@ export class RelationGraph {
 
   private dpr = 1;
   private root?: GraphNode;
+  private joinEdges: JoinEdge[] = [];
   private rects: Map<GraphNode, Rect> = new Map();
   private bounds: Bounds = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
@@ -90,11 +91,16 @@ export class RelationGraph {
     this.resize();
   }
 
-  /** Set the tree, fit it into the view, and render. */
-  setData(root: GraphNode): void {
+  /**
+   * Set the tree, fit it into the view, and render. `joinEdges` (optional) additionally draws
+   * confluence "join" connectors — see `layout()` / `JoinEdge`. Omitted/empty reproduces the
+   * plain tree layout exactly.
+   */
+  setData(root: GraphNode, joinEdges: JoinEdge[] = []): void {
     this.root = root;
+    this.joinEdges = joinEdges;
     this.fitted = false; // each setData re-fits — if hidden now, fit happens when shown
-    const res = layout(root, this.opts.layout);
+    const res = layout(root, this.opts.layout, joinEdges);
     this.rects = res.rects;
     this.bounds = res.bounds;
     this.fit();
@@ -103,7 +109,7 @@ export class RelationGraph {
 
   /** Re-layout the current tree (call after changing node sizes or structure). */
   refresh(): void {
-    if (this.root) this.setData(this.root);
+    if (this.root) this.setData(this.root, this.joinEdges);
   }
 
   /** Fit the whole graph into the view. */
@@ -264,6 +270,7 @@ export class RelationGraph {
       connector: this.opts.connector,
       labelOverflow: this.opts.labelOverflow,
       labelPadding: this.opts.labelPadding,
+      joinEdges: this.joinEdges,
     };
     render(rc, this.root);
   };
