@@ -10,8 +10,10 @@ npm install relaph
 
 - Place children on any side (`direction`: top / right / bottom / left)
 - Per-node sizing: fixed `width` / `height`, or `'fit-content'` to size the box to the label
-- Label overflow policy (`labelOverflow`): `'visible'` (default) or `'truncate'` — pixel-accurate `…` ellipsis inside the box
-- Sibling and rank (level) spacing (`margin.node` / `margin.rank`)
+- Node shape (`style.shape`): `'rect'` (default) or `'diamond'`
+- Edge labels (`GraphNode.edgeLabel` for a tree edge, `JoinEdge.label` for a join edge), centered on the connector with an automatic readability halo; per-node text color override via `GraphNode.edgeLabelColor` (falls back to `nodeStyle.textColor`)
+- Label overflow policy (`labelOverflow`): `'visible'` (default) or `'truncate'` — pixel-accurate `…` ellipsis inside the box; edge labels get their own independent cap, `connector.labelMaxWidth`
+- Sibling and rank (level) spacing (`margin.node` / `margin.rank`) — `margin.rank` accepts a single `number` (both axes) or `{ x?, y? }` to split the vertical-stack and horizontal-stack rank gaps independently
 - Child-group alignment (`baseline`: `start` / `center` / `end` — vertical stack = top/middle/bottom, horizontal stack = left/middle/right)
 - Connectors always join edge-center to edge-center
 - Node click handler (`onNodeClick`) / background click (`onBackgroundClick`)
@@ -78,6 +80,55 @@ graph.setData({
 });
 ```
 
+### Node shape
+
+Set `style.shape` (globally via `nodeStyle.shape`, or per node via `node.style.shape`) to
+`'diamond'` for a rhombus connecting the node rectangle's 4 edge midpoints — connector
+attachment is unchanged, since those midpoints are exactly where connectors already attach.
+Default `'rect'`.
+
+A `'fit-content'` diamond sizes itself so the label stays inscribed (a plain "label size + padding"
+box, as used for a rect, would let the label overflow the diamond's slanted sides). `hitTest`
+(node click / hit detection) stays a plain axis-aligned bounding-box test regardless of shape —
+for a diamond, the rect's corners (outside the drawn rhombus) still register a click. This is a
+known, accepted minor gap.
+
+```ts
+graph.setData({
+  id: 'root',
+  label: 'Decision',
+  style: { shape: 'diamond' },
+  width: 'fit-content',
+  children: [{ id: 'a', label: 'Yes', direction: 'right' }],
+});
+```
+
+### Edge labels
+
+`GraphNode.edgeLabel` labels the incoming tree edge from a node's parent; `JoinEdge.label` labels
+a join edge (a non-tree connector passed as `setData`'s second argument — used e.g. to draw a
+"confluence" node's incoming edges from multiple sources). Both render the same way: horizontal
+text, centered on the connector's middle segment, with an automatic background-color halo so it
+stays readable over the line. Font and color always come from the graph's default node style
+(`nodeStyle`), never a per-node style override — a recolored node does not recolor its own
+incoming edge label. Edge labels draw in full by default; cap their width with
+`connector.labelMaxWidth` (graph-level only — there is no per-edge override) for the same
+`…`-style ellipsis truncation node labels use.
+
+A node whose incoming tree connector is draw-suppressed in favor of join edges (a fork
+confluence — see `JoinEdge`'s doc comment in `src/types.ts`) ignores its own `edgeLabel`; use
+`JoinEdge.label` on its join edges instead.
+
+```ts
+const graph = new RelationGraph(canvas, {
+  connector: { labelMaxWidth: 80 },
+});
+graph.setData({
+  id: 'root',
+  children: [{ id: 'a', edgeLabel: 'triggers', direction: 'right' }],
+});
+```
+
 ## API
 
 | Method | Description |
@@ -87,6 +138,22 @@ graph.setData({
 | `fit(padding?)` | Fit the whole graph into the view |
 | `zoomBy(factor)` | Zoom centered on the view |
 | `destroy()` | Detach event listeners / observers |
+
+Data / option fields added in 0.4.0 (see the sections above for behavior details):
+
+| Field | Where | Description |
+| --- | --- | --- |
+| `shape?: 'rect' \| 'diamond'` | `NodeStyle` (global `nodeStyle` or per-node `node.style`) | Node outline shape; default `'rect'` |
+| `edgeLabel?: string` | `GraphNode` | Label of the incoming tree edge from the parent (ignored on the root and on confluence nodes) |
+| `label?: string` | `JoinEdge` | Label of a join edge |
+| `labelMaxWidth?: number` | `RelationGraphOptions.connector` (graph-level only) | Edge-label width cap; unset draws labels in full |
+
+Data / option fields added in 0.5.0:
+
+| Field | Where | Description |
+| --- | --- | --- |
+| `edgeLabelColor?: string` | `GraphNode` | Per-node text color override for the incoming tree edge's `edgeLabel`; unset falls back to `nodeStyle.textColor`. No equivalent on `JoinEdge`. |
+| `rank?: number \| { x?: number; y?: number }` | `RelationGraphOptions.margin` | Rank (level) gap; a `number` applies to both axes as before, `{ x?, y? }` splits the vertical-stack and horizontal-stack (+ confluence reposition) gaps independently |
 
 ## Layout constraints
 

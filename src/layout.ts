@@ -2,7 +2,19 @@ import type { Baseline, Direction, GraphNode, JoinEdge, Rect } from './types';
 
 export interface LayoutConfig {
   nodeMargin: number;
+  /**
+   * Gap between parent/child ranks (levels), applied to BOTH axes when `rankMarginX` /
+   * `rankMarginY` are not given — the pre-0.5.0 single-value shape, kept as the fallback so
+   * existing `LayoutConfig` literals (no axis-specific fields) reproduce identical layouts.
+   */
   rankMargin: number;
+  /** Rank gap for the vertical stack (right/left children — `placeVertical`'s `cx` offset).
+   *  Falls back to `rankMargin` when omitted. */
+  rankMarginX?: number;
+  /** Rank gap for the horizontal stack (top/bottom children — `placeHorizontal`'s `cy` offset)
+   *  AND the confluence reposition top offset (`applyConfluences`). Falls back to `rankMargin`
+   *  when omitted. */
+  rankMarginY?: number;
   defaultWidth: number;
   defaultHeight: number;
   /**
@@ -84,6 +96,8 @@ function measure(node: GraphNode, config: LayoutConfig): Measured {
   const [w, h] = sizeOf(node, config);
   const rects = new Map<GraphNode, Rect>();
   rects.set(node, { x: 0, y: 0, w, h });
+  const rankMarginX = config.rankMarginX ?? config.rankMargin;
+  const rankMarginY = config.rankMarginY ?? config.rankMargin;
 
   // baseline controls how this parent's child groups align along the parent edge.
   const baseline: Baseline = node.baseline ?? 'center';
@@ -113,7 +127,7 @@ function measure(node: GraphNode, config: LayoutConfig): Measured {
     children.forEach((child, i) => {
       const subtree = subtrees[i]!;
       const childRect = subtree.rects.get(child)!;
-      const cx = side === 'right' ? w + config.rankMargin : -config.rankMargin - childRect.w;
+      const cx = side === 'right' ? w + rankMarginX : -rankMarginX - childRect.w;
       const cy = firstCenter + i * pitch - childRect.h / 2; // place node center on the attachment point
       mergeShifted(rects, subtree, cx, cy);
     });
@@ -135,7 +149,7 @@ function measure(node: GraphNode, config: LayoutConfig): Measured {
     children.forEach((child, i) => {
       const subtree = subtrees[i]!;
       const childRect = subtree.rects.get(child)!;
-      const cy = side === 'bottom' ? h + config.rankMargin : -config.rankMargin - childRect.h;
+      const cy = side === 'bottom' ? h + rankMarginY : -rankMarginY - childRect.h;
       const cx = firstCenter + i * pitch - childRect.w / 2; // place node center on the attachment point
       mergeShifted(rects, subtree, cx, cy);
     });
@@ -175,6 +189,10 @@ const indexById = (root: GraphNode): Map<string, GraphNode> => {
  * source is itself a confluence — settles regardless of processing order: each pass recomputes
  * every confluence from the CURRENT rects, so a confluence that depended on a not-yet-placed
  * confluence in an earlier pass is corrected once that one lands.
+ *
+ * `rankMargin` here is always the Y-axis value (`LayoutConfig.rankMarginY`, falling back to
+ * `rankMargin`) — a confluence's reposition is a top-of-block placement, the same axis as
+ * `placeHorizontal`'s rank gap.
  */
 const applyConfluences = (rects: Map<GraphNode, Rect>, root: GraphNode, joinEdges: JoinEdge[], rankMargin: number): void => {
   if (joinEdges.length === 0) return;
@@ -221,7 +239,7 @@ const applyConfluences = (rects: Map<GraphNode, Rect>, root: GraphNode, joinEdge
 export function layout(root: GraphNode, config: LayoutConfig, joinEdges?: JoinEdge[]): LayoutResult {
   const measured = measure(root, config);
   if (joinEdges && joinEdges.length > 0) {
-    applyConfluences(measured.rects, root, joinEdges, config.rankMargin);
+    applyConfluences(measured.rects, root, joinEdges, config.rankMarginY ?? config.rankMargin);
     return { rects: measured.rects, bounds: boundsOf(measured.rects.values()) };
   }
   return { rects: measured.rects, bounds: measured.bounds };

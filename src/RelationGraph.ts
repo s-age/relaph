@@ -1,5 +1,5 @@
 import { layout, type Bounds, type LayoutConfig } from './layout';
-import { render, type RenderContext } from './renderer';
+import { diamondBoxWidth, render, type RenderContext } from './renderer';
 import type { GraphNode, JoinEdge, NodeStyle, Point, Rect, RelationGraphOptions } from './types';
 import { Viewport } from './viewport';
 
@@ -10,12 +10,13 @@ const DEFAULT_NODE_STYLE: NodeStyle = {
   textColor: '#0f172a',
   borderRadius: 8,
   font: '14px system-ui, sans-serif',
+  shape: 'rect',
 };
 
 interface Resolved {
   layout: LayoutConfig;
   nodeStyle: NodeStyle;
-  connector: { color: string; width: number };
+  connector: { color: string; width: number; labelMaxWidth?: number };
   background: string;
   zoomSpeed: number;
   labelPadding: { x: number; y: number };
@@ -58,10 +59,17 @@ export class RelationGraph {
     this.canvas = canvas;
     this.ctx = ctx;
 
+    const rankOpt = options.margin?.rank;
+    // number = both axes (back-compat); { x?, y? } = per-axis, either side omitted defaulting
+    // to the same 64 the bare-number form defaults to.
+    const rankMarginX = typeof rankOpt === 'number' ? rankOpt : (rankOpt?.x ?? 64);
+    const rankMarginY = typeof rankOpt === 'number' ? rankOpt : (rankOpt?.y ?? 64);
     this.opts = {
       layout: {
         nodeMargin: options.margin?.node ?? 24,
-        rankMargin: options.margin?.rank ?? 64,
+        rankMargin: rankMarginX,
+        rankMarginX,
+        rankMarginY,
         defaultWidth: options.defaultNodeSize?.width ?? 120,
         defaultHeight: options.defaultNodeSize?.height ?? 44,
         measureNode: (node) => this.measureNode(node),
@@ -70,6 +78,7 @@ export class RelationGraph {
       connector: {
         color: options.connector?.color ?? '#cbd5e1',
         width: options.connector?.width ?? 1.5,
+        labelMaxWidth: options.connector?.labelMaxWidth,
       },
       background: options.background ?? '#ffffff',
       zoomSpeed: options.zoomSpeed ?? 1,
@@ -156,18 +165,28 @@ export class RelationGraph {
    * Box of a 'fit-content' node: label measured with the node's effective font, plus
    * labelPadding on each side. Label-less nodes fall back to the default size (an empty
    * measurement would collapse the box to bare padding).
+   *
+   * For a diamond-shaped node, a rect-sized box would always let the label overflow the
+   * inscribed diamond, so width is instead solved via `diamondBoxWidth` (inverting the
+   * inscribed-width constraint) using the node's EFFECTIVE height: its own fixed numeric
+   * `height` if specified, else this same fit-content height.
    */
   private measureNode(node: GraphNode): { width: number; height: number } {
     const label = node.label ?? '';
     if (!label) return { width: this.opts.layout.defaultWidth, height: this.opts.layout.defaultHeight };
-    const font = node.style?.font ?? this.opts.nodeStyle.font;
-    this.ctx.font = font;
+    const s = { ...this.opts.nodeStyle, ...node.style };
+    this.ctx.font = s.font;
     const m = this.ctx.measureText(label);
     const boxH = m.fontBoundingBoxAscent + m.fontBoundingBoxDescent;
     // Older engines report no font box metrics; approximate from the font-size token then.
-    const textH = boxH > 0 ? boxH : parseFloat(font) || 16;
+    const textH = boxH > 0 ? boxH : parseFloat(s.font) || 16;
     const pad = this.opts.labelPadding;
-    return { width: m.width + pad.x * 2, height: textH + pad.y * 2 };
+    const height = textH + pad.y * 2;
+    if ((s.shape ?? 'rect') === 'diamond') {
+      const effectiveH = typeof node.height === 'number' ? node.height : height;
+      return { width: diamondBoxWidth(m.width, pad.x, textH, effectiveH), height };
+    }
+    return { width: m.width + pad.x * 2, height };
   }
 
   private resize(): void {
@@ -189,6 +208,11 @@ export class RelationGraph {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
+  /**
+   * AABB hit test against each node's rect — unchanged by `style.shape`. For a `'diamond'` node
+   * this is a known, accepted minor gap: the rect's corners (outside the drawn rhombus) still
+   * register a click/hit.
+   */
   private hitTest(screen: Point): GraphNode | undefined {
     const w = this.vp.screenToWorld(screen);
     let hit: GraphNode | undefined;
@@ -271,6 +295,7 @@ export class RelationGraph {
       labelOverflow: this.opts.labelOverflow,
       labelPadding: this.opts.labelPadding,
       joinEdges: this.joinEdges,
+      background: this.opts.background,
     };
     render(rc, this.root);
   };

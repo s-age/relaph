@@ -36,6 +36,10 @@ export interface NodeStyle {
   textColor: string;
   borderRadius: number;
   font: string;
+  /** Node outline shape. 'rect' (default) or 'diamond' (the rhombus connecting the node
+   *  rectangle's 4 edge midpoints — connector attachment is unchanged, since `edgeCenter()`
+   *  already attaches at those same midpoints). */
+  shape?: 'rect' | 'diamond';
 }
 
 /**
@@ -58,6 +62,22 @@ export interface GraphNode {
   baseline?: Baseline;
   /** Per-node style overrides. */
   style?: Partial<NodeStyle>;
+  /**
+   * Label of the incoming tree edge from this node's parent (each non-root node is 1:1 with
+   * that edge). Rendered centered on the connector's middle segment. Ignored for a node whose
+   * incoming tree connector is suppressed (a confluence node — see `JoinEdge`); use
+   * `JoinEdge.label` for those instead. Ignored on the root (no incoming edge).
+   */
+  edgeLabel?: string;
+  /**
+   * Per-node text color override for `edgeLabel` (the incoming tree edge label). Unset falls
+   * back to the graph-level `nodeStyle.textColor` (the current default). This is a standalone
+   * channel dedicated to the incoming edge label only — it is never merged with `style` (a
+   * recolored node still does not recolor its own incoming edge label via `style.textColor`),
+   * and `JoinEdge` has no equivalent per-edge color knob. Ignored wherever `edgeLabel` itself is
+   * ignored (the root, or a confluence node).
+   */
+  edgeLabelColor?: string;
   /** Arbitrary user data; available in click handlers etc. */
   data?: unknown;
   /** Child nodes (can be nested arbitrarily deep). */
@@ -86,6 +106,10 @@ export interface JoinEdge {
   to: string;
   /** Per-edge connector style override, layered over the graph's default connector style. */
   style?: Partial<ConnectorStyle>;
+  /** Label for this join edge, centered on the connector's middle segment (same rendering as
+   *  `GraphNode.edgeLabel`, since a confluence's incoming tree edges are draw-suppressed in
+   *  favor of join edges). */
+  label?: string;
 }
 
 export interface RelationGraphOptions {
@@ -93,15 +117,28 @@ export interface RelationGraphOptions {
   margin?: {
     /** Gap between sibling nodes. Default 24. */
     node?: number;
-    /** Gap between parent and child ranks (levels). Default 64. */
-    rank?: number;
+    /**
+     * Gap between parent and child ranks (levels). A `number` applies to both axes (the
+     * pre-0.5.0 shape — fully backward compatible). Pass `{ x?, y? }` to split it: `x` is the
+     * vertical-stack (right/left children) rank gap, `y` is the horizontal-stack (top/bottom
+     * children) rank gap AND the confluence-reposition gap (`applyConfluences`, itself a
+     * top-of-block placement — a y-axis concern). Either axis omitted from the object form
+     * falls back to the same default as the bare number, 64.
+     */
+    rank?: number | { x?: number; y?: number };
   };
   /** Default size for nodes that omit width/height. */
   defaultNodeSize?: { width: number; height: number };
   /** Default node style. */
   nodeStyle?: Partial<NodeStyle>;
-  /** Connector (link line) style. */
-  connector?: ConnectorStyle;
+  /**
+   * Connector (link line) style, plus the graph-level cap for edge-label width (`labelMaxWidth`).
+   * `labelMaxWidth` is intentionally NOT part of the shared `ConnectorStyle` type (that would
+   * silently allow a per-`JoinEdge` override via `JoinEdge.style`, which is `Partial<ConnectorStyle>`)
+   * — it lives only at this graph-level option site. Unset = edge labels draw in full (no
+   * truncation).
+   */
+  connector?: ConnectorStyle & { labelMaxWidth?: number };
   /** Background color. Default '#ffffff'. */
   background?: string;
   /**
